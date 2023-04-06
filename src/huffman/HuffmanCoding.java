@@ -6,6 +6,13 @@ import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 
+import javax.sound.midi.Track;
+
+import huffman.CharFreq;
+import huffman.StdIn;
+
+
+
 /**
  * This class contains methods which, when used together, perform the
  * entire Huffman Coding encoding and decoding process
@@ -35,7 +42,40 @@ public class HuffmanCoding {
     public void makeSortedList() {
         StdIn.setFile(fileName);
 
-	/* Your code goes here */
+        sortedCharFreqList = new ArrayList<CharFreq>();
+
+        int[] first = new int[128];
+
+        double second = 0.0;
+
+
+        while(StdIn.hasNextChar())
+        {
+            first[StdIn.readChar()]++;
+            second++;
+        }
+
+        for(int i=0;i<first.length;i++)
+        {
+            if(first[i] != 0)
+            {
+                CharFreq newchar = new CharFreq((char) i, first[i]/second);
+                sortedCharFreqList.add(newchar);
+            }
+        }
+
+        if(sortedCharFreqList.size()==1)
+        {
+            char prev = sortedCharFreqList.get(0).getCharacter();
+            char next = (char) (((int)prev+1)%128); 
+            CharFreq addChars  = new CharFreq(next, 0);
+            sortedCharFreqList.add(addChars); 
+        }
+        
+
+       Collections.sort(sortedCharFreqList); 
+        
+
     }
 
     /**
@@ -43,8 +83,103 @@ public class HuffmanCoding {
      * in huffmanRoot
      */
     public void makeTree() {
+     
 
-	/* Your code goes here */
+        Queue<TreeNode> source = new Queue<TreeNode>();
+        Queue<TreeNode> target = new Queue<TreeNode>();
+        Queue<TreeNode> dequeues = new Queue<TreeNode>();
+
+        for(int i=0;i<sortedCharFreqList.size();i++)
+        {
+            TreeNode newTrees = new TreeNode(); 
+
+            newTrees.setData(getSortedCharFreqList().get(i));
+            source.enqueue(newTrees);
+        }
+
+
+
+
+        while(!source.isEmpty() || target.size()!=1)
+        {
+            while(dequeues.size()<2) 
+            {
+                if(target.isEmpty())
+                {
+                    dequeues.enqueue(source.dequeue()); 
+                }
+                else
+                {
+                    if(!source.isEmpty())
+                    {
+                        if(source.peek().getData().getProbOcc()<=target.peek().getData().getProbOcc())
+                        {
+                            dequeues.enqueue(source.dequeue());
+                        }
+                        else if(source.peek().getData().getProbOcc()>target.peek().getData().getProbOcc())
+                        {
+                            dequeues.enqueue(target.dequeue());
+                        }
+                    }
+                    else{
+                        dequeues.enqueue(target.dequeue());
+                    }
+                }
+            }
+            TreeNode smallestNode = new TreeNode();
+            if(dequeues.isEmpty())
+            {
+                smallestNode=null;
+            }
+            else
+            {
+                smallestNode=dequeues.dequeue();
+            }
+
+            TreeNode secondsmallestNode = new TreeNode();
+            if(dequeues.isEmpty())
+            {
+                secondsmallestNode=null;
+            }
+            else
+            {
+                secondsmallestNode=dequeues.dequeue();
+            }
+
+            double probOcc1;
+            double probOcc2; 
+
+            if(smallestNode==null)
+            {
+                probOcc1=0;
+            }
+            else
+            {
+                probOcc1=smallestNode.getData().getProbOcc();
+            }
+
+            if(secondsmallestNode==null)
+            {
+                probOcc2=0;
+            }
+            else
+            {
+                probOcc2=secondsmallestNode.getData().getProbOcc();
+            }
+
+            TreeNode t= new TreeNode();
+            CharFreq c = new CharFreq(null, probOcc1+probOcc2);
+            t.setData(c);
+            t.setLeft(smallestNode);
+            t.setRight(secondsmallestNode);
+            target.enqueue(t);
+           
+        }
+
+        huffmanRoot=target.dequeue();
+        huffmanRoot.getData().setProbOcc(1.00);
+
+        
     }
 
     /**
@@ -54,8 +189,31 @@ public class HuffmanCoding {
      * Set encodings to this array.
      */
     public void makeEncodings() {
+       
+        TreeNode newTreeNode = huffmanRoot;
 
-	/* Your code goes here */
+        encodings = new String[128];
+
+
+       for(int i=0;i<sortedCharFreqList.size();i++)
+       {
+           String bitString = "";
+           traverse(encodings, newTreeNode, bitString);
+       }
+
+    }
+
+    private void traverse(String[] encoders, TreeNode root, String newstr){
+
+        if(root.getLeft() == null && root.getRight()==null)
+        {
+            encoders[root.getData().getCharacter()]=newstr;
+            return; 
+        }
+
+        traverse(encoders,root.getLeft(),newstr+"0");
+        traverse(encoders,root.getRight(),newstr+"1");
+    
     }
 
     /**
@@ -65,10 +223,17 @@ public class HuffmanCoding {
      * @param encodedFile The file name into which the text file is to be encoded
      */
     public void encode(String encodedFile) {
-        StdIn.setFile(fileName);
 
-	/* Your code goes here */
+        StdIn.setFile(fileName);
+        String comps = "";
+        while(StdIn.hasNextChar()){
+            comps += encodings[(int) StdIn.readChar()];
+        }
+        writeBitString(encodedFile, comps);
+        
     }
+
+   
     
     /**
      * Writes a given string of 1's and 0's to the given file byte by byte
@@ -129,10 +294,32 @@ public class HuffmanCoding {
      * @param encodedFile The file which has already been encoded by encode()
      * @param decodedFile The name of the new file we want to decode into
      */
+
+
     public void decode(String encodedFile, String decodedFile) {
         StdOut.setFile(decodedFile);
 
-	/* Your code goes here */
+        String bitString = readBitString(encodedFile);
+
+        while(bitString.length()>0)
+        {
+            TreeNode starters = huffmanRoot;
+            while(starters.getData().getCharacter()== null && bitString.length()>0)
+            {
+                if(bitString.charAt(0)== '0')
+                {
+                    starters=starters.getLeft();
+                }
+                if(bitString.charAt(0)== '1')
+                {
+                    starters=starters.getRight();
+                }
+
+                bitString=bitString.substring(1);
+            }
+            StdOut.print(starters.getData().getCharacter());
+        }
+	
     }
 
     /**
